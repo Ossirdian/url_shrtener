@@ -1,0 +1,294 @@
+openapi: 3.0.3
+info:
+  title: URL Shortener API
+  version: 1.0.0
+  description: API for creating, resolving, updating, and deleting short URLs.
+servers:
+  - url: http://localhost:8084
+x-ogen:
+  target: internal/api/url_shortener/v1
+  package: urlshortenerv1
+tags:
+  - name: URLs
+paths:
+  /url/:
+    post:
+      operationId: createURL
+      tags:
+        - URLs
+      summary: Create a short URL
+      description: >-
+        Creates a mapping from a destination URL to an alias. When alias is
+        omitted or empty, the service generates a unique alias of 6 characters.
+        Invalid JSON or URL values return HTTP 400. An alias conflict returns HTTP 409.
+      security:
+        - BasicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: Valid destination URL.
+                alias:
+                  type: string
+                  minLength: 1
+                  maxLength: 32
+                  pattern: '^[A-Za-z0-9_-]+$'
+                  description: >-
+                    Optional unique alias. If omitted or empty, the service
+                    generates a random alias of 6 characters.
+      responses:
+        '201':
+          description: URL created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - alias
+                properties:
+                  status:
+                    type: string
+                    enum: [OK]
+                  alias:
+                    type: string
+                    description: Created alias.
+        '400':
+          description: Invalid JSON, URL, or alias.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Alias is already in use.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error while creating the URL mapping.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid or missing HTTP Basic credentials.
+  /{alias}:
+    get:
+      operationId: resolveURL
+      tags:
+        - URLs
+      summary: Redirect to the destination URL
+      description: Resolves an alias and redirects to its destination.
+      security:
+        - BasicAuth: []
+      parameters:
+        - name: alias
+          in: path
+          required: true
+          description: Alias identifying the short URL.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: '^[A-Za-z0-9_-]+$'
+      responses:
+        '302':
+          description: Redirect to the destination URL.
+          headers:
+            Location:
+              description: Destination URL.
+              schema:
+                type: string
+                format: uri
+        '400':
+          description: Invalid alias.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid or missing HTTP Basic credentials.
+        '404':
+          description: Alias was not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error while resolving the alias.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /url/{alias}:
+    patch:
+      operationId: updateURL
+      tags:
+        - URLs
+      summary: Update a short URL alias
+      description: Changes the alias identified by the path parameter.
+      security:
+        - BasicAuth: []
+      parameters:
+        - name: alias
+          in: path
+          required: true
+          description: Existing alias to replace.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: '^[A-Za-z0-9_-]+$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newAlias
+              properties:
+                newAlias:
+                  type: string
+                  minLength: 1
+                  maxLength: 32
+                  pattern: '^[A-Za-z0-9_-]+$'
+      responses:
+        '200':
+          description: Alias updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - alias
+                  - url
+                properties:
+                  alias:
+                    type: string
+                  url:
+                    type: string
+                    format: uri
+        '401':
+          description: Invalid or missing HTTP Basic credentials.
+        '400':
+          description: Invalid request or alias.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Old alias does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: New alias is already in use.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error while updating the URL mapping.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteURL
+      tags:
+        - URLs
+      summary: Delete a short URL
+      description: Deletes the URL mapping identified by its alias.
+      security:
+        - BasicAuth: []
+      parameters:
+        - name: alias
+          in: path
+          required: true
+          description: Alias identifying the short URL.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 32
+            pattern: '^[A-Za-z0-9_-]+$'
+      responses:
+        '200':
+          description: URL mapping deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    enum: [OK]
+        '400':
+          description: Invalid alias.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid or missing HTTP Basic credentials.
+        '404':
+          description: No URL mapping exists for the supplied alias.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - error
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - Error
+                  error:
+                    type: string
+        '500':
+          description: Internal error while deleting the URL mapping.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - error
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - Error
+                  error:
+                    type: string
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - status
+        - error
+      properties:
+        status:
+          type: string
+          enum: [Error]
+        error:
+          type: string
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic

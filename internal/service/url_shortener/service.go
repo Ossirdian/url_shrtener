@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	generatedAliasLength = 6
-	maxAliasLength       = 32
-	letters              = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	generatedAliasLength       = 4
+	maxAliasLength             = 32
+	maxAliasGenerationAttempts = 10
+	letters                    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 )
 
 var aliasPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
@@ -60,8 +61,7 @@ func (s *Service) Create(ctx context.Context, input model.URLCreate) (model.URL,
 		return s.repo.Create(ctx, input)
 	}
 
-	aliasCreated := false
-	for !aliasCreated {
+	for attempt := 0; attempt < maxAliasGenerationAttempts; attempt++ {
 		alias := NewRandomString(generatedAliasLength)
 
 		_, err := s.repo.GetByAlias(ctx, alias)
@@ -81,11 +81,10 @@ func (s *Service) Create(ctx context.Context, input model.URLCreate) (model.URL,
 			return model.URL{}, err
 		}
 
-		aliasCreated = true
 		return created, nil
 	}
 
-	return model.URL{}, repository.ErrConflict
+	return model.URL{}, errors.New("failed to generate unique alias after maximum attempts")
 }
 
 func isValidURL(value string) bool {

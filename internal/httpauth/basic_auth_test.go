@@ -1,20 +1,16 @@
 package httpauth
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 
-	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
 )
 
-func TestBasicAuth_AcceptsEnvironmentCredentials(t *testing.T) {
-	username, password := authCredentials(t)
+func TestBasicAuth_AcceptsCorrectCredentials(t *testing.T) {
+	username, password := testCredentials(t)
 	handler := BasicAuth(username, password)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -29,7 +25,7 @@ func TestBasicAuth_AcceptsEnvironmentCredentials(t *testing.T) {
 }
 
 func TestBasicAuth_RejectsMissingCredentials(t *testing.T) {
-	username, password := authCredentials(t)
+	username, password := testCredentials(t)
 	handler := BasicAuth(username, password)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		t.Fatal("next handler must not be called for unauthenticated request")
 	}))
@@ -43,22 +39,10 @@ func TestBasicAuth_RejectsMissingCredentials(t *testing.T) {
 	require.NotEmpty(t, rec.Header().Get("WWW-Authenticate"))
 }
 
-func authCredentials(t *testing.T) (string, string) {
+func testCredentials(t *testing.T) (string, string) {
 	t.Helper()
+	t.Setenv("AUTH_USERNAME", "test-user")
+	t.Setenv("AUTH_PASSWORD", "test-password")
 
-	_, testFile, _, ok := runtime.Caller(0)
-	require.True(t, ok, "could not locate auth test file")
-	envFile := filepath.Join(filepath.Dir(testFile), "..", "..", ".env")
-	err := godotenv.Load(envFile)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		require.NoError(t, err)
-	}
-
-	username, usernameSet := os.LookupEnv("AUTH_USERNAME")
-	password, passwordSet := os.LookupEnv("AUTH_PASSWORD")
-	if !usernameSet || !passwordSet || username == "" || password == "" {
-		t.Skip("AUTH_USERNAME and AUTH_PASSWORD must be set in .env or the service environment")
-	}
-
-	return username, password
+	return os.Getenv("AUTH_USERNAME"), os.Getenv("AUTH_PASSWORD")
 }

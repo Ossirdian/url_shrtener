@@ -35,7 +35,7 @@ func New(log *slog.Logger, updateURL UpdateURL) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		const fn = "handlers.url.update.New"
 
-		log = log.With(
+		log := log.With(
 			slog.String("fn", fn),
 			slog.String("request_id", middleware.GetReqID(r.Context())),
 		)
